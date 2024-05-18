@@ -1,0 +1,324 @@
+---
+title: "Fish Diversity Ecology Assessment"
+author: "James Tsalah"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: tango
+---
+
+# Diversity Metrics Background
+
+Types of Diversity
+
+-   Gamma Diversity encompasses the diversity of an entire region.
+-   Alpha Diversity encompasses the diversity at a sampling site (richness).
+-   Beta Diversity encompasses the difference in diversity between samples.
+    -   Typically calculated through space, but can also be calculated through time.
+    -   We are thinking about two communities, and how they are different frome each other.
+
+Dissimilarities among communities arises from two different processes:
+
+-   Species Replacement (Turnover): Species tend to replace each other along ecological gradients.
+-   Richness differences (Nestedness): One comunity might have more species present than the other. For example, one community may be a nested subset of another community-meaning that with five species at a location, three of those same five might be present at another location.
+
+Beta Diversity Indices
+
+-   **Jaccard's dissimilarity coefficient**, is a statistic used for gauging the similarity and diversity of sample sets.
+-   Sorenson
+
+Jaccard vs. Sorensen
+
+-   Jaccard calculates the unique species as a proportion of the total number of species recorded in the two communities.
+-   Sorensen does the same, but double weights the shared species.
+-   Sorensen therefore always has a lower value than Jaccard.
+
+# Two Families of Beta Diversity
+
+#### Table 1: Podani & Baslega Family Calculations
+
+|              | **Podani**                                     | **Baslega**                                                                                                 |
+|------------------|------------------------|------------------------------|
+| **Jaccard**  | $$Repl_J = \frac{2 \min(b, c)}{(a + b + c)}$$  | $$Repl_{BJ} = \beta_{Jtu} = \frac{2 \min(b, c)}{a + 2 \min(b, c)}$$                                         |
+|              | $$Rich_J = \frac{|b - c|}{(a + b + c)}$$       | $$Nes_{BJ} = \beta_{jne} = DJ - \beta_{Jtu} = \frac{|b - c|}{a + b + c} \times \frac{a}{a + 2 \min(b, c)}$$ |
+| **Sorensen** | $$Repl_S = \frac{2 \min(b, c)}{(2a + b + c)}$$ | $$Repl_{BS} = \beta_{Sim} = \frac{\min(b, c)}{a + \min(b, c)}$$                                             |
+|              | $$Rich_S = \frac{|b - c|}{(2a + b + c)}$$      | $$Nes_{BS} = \beta_{nes} = DS - \beta_{Sim} = \frac{|b - c|}{2a + b + c} \times \frac{a}{a + \min(b, c)}$$  |
+
+Key:
+
+- a is the shared species.
+- b & c the number of sapecies that are unique to either the first (b) or second (c) community.
+
+# The Doubs Fish Dataset - Verneaux, J. (1973)
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+suppressPackageStartupMessages({
+  require(adespatial)
+  require(ade4)
+  require(vegan)
+})
+```
+
+Let's view the dataset! The Doubs Fish dataset contains fish taxa as columns, each of the 30 rows is a site, and the row value represents the amount of observations at that site.
+
+```{r}
+data(doubs)
+fish = doubs$fish
+fish = fish[-8,] # Remove site 8 which has no observations for any fish.
+head(fish[,1:14])
+```
+
+Each column is a species of fish, while each row is a site with the number of each species observed at that site.
+
+# Assessing Fish Gamma Diversity
+
+Gamma diversity is essentially the total number of unique species across all sites.
+
+```{r}
+# Calculate gamma diversity (total species richness across all sites)
+gamma_diversity <- specnumber(colSums(fish))
+
+# Display gamma diversity result
+cat("Gamma Diversity (Total Species Richness):", gamma_diversity, "\n")
+```
+
+# Assessing Fish Alpha Diversity
+
+Alpha diversity refers to the diversity within a particular area or ecosystem, and is typically expressed by the number of species (species richness) in that ecosystem.
+
+```{r}
+# Calculate species richness (alpha diversity) for each site
+alpha_diversity <- specnumber(fish)
+
+# Calculate Shannon diversity index for each site
+shannon_diversity <- diversity(fish, index = "shannon")
+
+# Calculate Simpson diversity index for each site
+simpson_diversity <- diversity(fish, index = "simpson")
+
+# Display results
+alpha_results <- data.frame(Site = rownames(fish), 
+                            Species_Richness = alpha_diversity,
+                            Shannon_Index = shannon_diversity,
+                            Simpson_Index = simpson_diversity)
+print(alpha_results)
+```
+
+# Assessing Fish Beta Diversity
+
+## Calculate Beta Diversity Components
+
+We can utilize the beta.div.comp() function from the adespatial package in order to calculate fish replacement and richness difference components. This utilizes our fish species presence-absence data, and for this analysis we will be focusing on the Podani family of indices which includes the Jaccard and Sorensen dissimilarity coefficients and their quantitative forms.
+
+### Jaccard's Component Beta Diversity
+
+```{r}
+# Calculate Beta Diversity Components for Jaccard
+fish.bd.j = beta.div.comp(fish, coef = "J", quant = T)
+
+# View Jaccard's Beta Diversity Components
+fish.bd.j$part
+```
+
+Jaccard's Component Beta Diversity Interpretation
+
+-   BDtotal = Total Beta Diversity = 37.7%: Suggests that about 37.7% of the species composition is different among the sites. This means that the sites share some species, but there are also species that are unique to each site.
+-   Repl = Replacement: 14.15% of Beta Diversity is accounted for by Replacement
+-   RichDif = Richness Difference: 23.55% of Beta Diversity is accounted for by Richness Differences
+-   Proportions of influence are calculated with Repl/BDtotal and RichDif/BDtotal, which tell us that 37.53% of Beta Diversity is proportionally influenced by Replacement and 62.47% is by Richness Differences (sums to 1).
+
+### Sorensen's Component Beta Diversity
+
+```{r}
+# Calculate Beta Diversity Components for Sorensen
+fish.bd.s = beta.div.comp(fish, coef = "S", quant = T)
+
+# View Sorensen's Beta Diversity Components
+fish.bd.s$part
+```
+
+Sorensen's Component Beta Diversity Interpretation
+
+-   BDtotal = Total Beta Diversity = 32.38%: Suggests that about 32.38% of the species composition is different among the sites. This means that the sites share some species, but there are also species that are unique to each site.
+-   Repl = Replacement: 12.03% of Beta Diversity is accounted for by Replacement
+-   RichDif = Richness Difference: 20.03% of Beta Diversity is accounted for by Richness Differences
+-   Proportions of influence are calculated with Repl/BDtotal and RichDif/BDtotal, which tell us that 37.17% of Beta Diversity is proportionally influenced by Replacement and 62.83% is by Richness Differences (sums to 1).
+
+## Calculate Local Contributions to Beta Diversity
+
+Local Contributions to Beta Diversity narrows the scope from all sites, like in the previous calculation of Beta Diversity Components, to site specific contributions.
+
+### Jaccard's Local Contributions to Beta Diversity
+
+#### Jaccard's Local Replacement Contributions to Beta Diversity
+
+```{r}
+# Calculate Local Contribution to Beta Diversity for Jaccard
+local.repl.j = LCBD.comp(fish.bd.j$repl, sqrt.D = T)
+
+# View Jaccard's Local Replacement Contributions
+local.repl.j
+```
+
+#### Jaccard's Local Richness Difference Contributions to Beta Diversity
+
+```{r}
+# Calculate Jaccard's Local Richness Difference / Turnover Contributions
+local.rich.j = LCBD.comp(fish.bd.j$rich, sqrt.D = T)
+
+# View Jaccard's Local Richness Difference / Turnover Contributions
+local.rich.j
+```
+
+### Sorensen's Local Contributions to Beta Diversity
+
+#### Sorensen's Local Replacement Contributions to Beta Diversity
+
+```{r}
+# Calculate Sorensen's Local Replacement Contributions
+local.repl.s = LCBD.comp(fish.bd.s$repl, sqrt.D = T)
+
+# View Sorensen's Local Replacement Contributions
+local.repl.s
+```
+
+#### Sorensen's Local Richness Difference Contributions to Beta Diversity
+
+```{r}
+# Calculate Sorensen's Local Richness Difference / Turnover Contributions
+local.rich.s = LCBD.comp(fish.bd.s$rich, sqrt.D = T)
+
+# View Sorensen's Local Richness Difference / Turnover Contributions
+local.rich.s
+```
+
+### Local Contributions to Beta Diversity
+
+```{=html}
+<style>
+  table, th, td {
+    border-collapse: collapse;
+    text-align: center;
+    padding: 8px;
+  }
+  th, td {
+    text-align: center;
+  }
+</style>
+```
+#### Table 2: Jaccard's Local Contributions to Beta Diversity
+
+| Site | Repl. LCBD   | Repl. Impact  | RD LCBD    | RD Impact  |
+|------|--------------|---------------|------------|------------|
+| 1    | -0.006412591 | Low Impact    | 0.08471002 | High Impact|
+| 2    | 0.031057500  | Medium Impact | 0.03689583 | Medium Impact|
+| 3    | 0.045826744  | Medium Impact | 0.02564589 | Medium Impact|
+| 4    | 0.041488590  | Medium Impact | 0.02430854 | Medium Impact|
+| 5    | 0.050099738  | High Impact   | 0.02430643 | Medium Impact|
+| 6    | 0.033288092  | Medium Impact | 0.02590333 | Medium Impact|
+| 7    | 0.038157146  | Medium Impact | 0.02669263 | Medium Impact|
+| 8    | 0.062190531  | High Impact   | 0.02994095 | Medium Impact|
+| 9    | 0.036298246  | Medium Impact | 0.03192175 | Medium Impact|
+| 10   | 0.029138579  | Medium Impact | 0.04130865 | High Impact|
+| 11   | 0.045281708  | Medium Impact | 0.02413163 | Medium Impact|
+| 12   | 0.062168779  | High Impact   | 0.02188155 | Medium Impact|
+| 13   | 0.049345906  | Medium Impact | 0.02361610 | Medium Impact|
+| 14   | 0.042641201  | Medium Impact | 0.02475546 | Medium Impact|
+| 15   | 0.042421271  | Medium Impact | 0.02535543 | Medium Impact|
+| 16   | 0.032310835  | Medium Impact | 0.02748067 | Medium Impact|
+| 17   | 0.034572053  | Medium Impact | 0.02614698 | Medium Impact|
+| 18   | 0.032215076  | Medium Impact | 0.02769883 | Medium Impact|
+| 19   | 0.024644628  | Medium Impact | 0.03182826 | Medium Impact|
+| 20   | 0.022357400  | Medium Impact | 0.03395379 | Medium Impact|
+| 21   | 0.017866032  | Low Impact    | 0.03931829 | High Impact|
+| 22   | 0.006678116  | Low Impact    | 0.07649302 | High Impact|
+| 23   | 0.068538661  | High Impact   | 0.02911869 | Medium Impact|
+| 24   | 0.049834767  | Medium Impact | 0.04087927 | High Impact|
+| 25   | 0.044771438  | Medium Impact | 0.02497104 | Medium Impact|
+| 26   | 0.027217645  | Medium Impact | 0.03370123 | Medium Impact|
+| 27   | 0.022237378  | Medium Impact | 0.03776519 | Medium Impact|
+| 28   | 0.001319271  | Low Impact    | 0.05017985 | High Impact|
+| 29   | 0.012445261  | Low Impact    | 0.04909067 | Medium Impact|
+
+#### Table 3: Sorensen's Local Contributions to Beta Diversity
+
+| Site | Repl. LCBD   | Repl. Impact  | RD LCBD    | RD Impact  |
+|------|--------------|---------------|------------|------------|
+| 1    | -0.001714649 | Low Impact    | 0.09507352 | High Impact|
+| 2    | 0.035404519  | Medium Impact | 0.03703022 | Medium Impact|
+| 3    | 0.047725546  | Medium Impact | 0.02624392 | Medium Impact|
+| 4    | 0.038258992  | Medium Impact | 0.02225857 | Medium Impact|
+| 5    | 0.044715682  | Medium Impact | 0.02151469 | Medium Impact|
+| 6    | 0.028114225  | Medium Impact | 0.02225857 | Medium Impact|
+| 7    | 0.038277136  | Medium Impact | 0.02624392 | Medium Impact|
+| 8    | 0.063242693  | High Impact   | 0.03040469 | Medium Impact|
+| 9    | 0.033338279  | Medium Impact | 0.03040469 | Medium Impact|
+| 10   | 0.030989795  | Medium Impact | 0.04105238 | High Impact|
+| 11   | 0.046741511  | Medium Impact | 0.02404728 | Medium Impact|
+| 12   | 0.065791821  | High Impact   | 0.02326592 | Medium Impact|
+| 13   | 0.050770890  | High Impact   | 0.02162119 | Medium Impact|
+| 14   | 0.040029554  | Medium Impact | 0.02143146 | Medium Impact|
+| 15   | 0.036657017  | Medium Impact | 0.02261790 | Medium Impact|
+| 16   | 0.024921859  | Medium Impact | 0.02400430 | Medium Impact|
+| 17   | 0.027294303  | Medium Impact | 0.02313578 | Medium Impact|
+| 18   | 0.025612533  | Medium Impact | 0.02519746 | Medium Impact|
+| 19   | 0.022755535  | Medium Impact | 0.03116836 | Medium Impact|
+| 20   | 0.021960902  | Medium Impact | 0.03454923 | High Impact|
+| 21   | 0.018499105  | Low Impact    | 0.04099183 | High Impact|
+| 22   | 0.012371688  | Low Impact    | 0.08552391 | High Impact|
+| 23   | 0.078778104  | High Impact   | 0.02810169 | Medium Impact|
+| 24   | 0.057510394  | High Impact   | 0.04105238 | High Impact|
+| 25   | 0.046333699  | Medium Impact | 0.02351030 | Medium Impact|
+| 26   | 0.027675386  | Medium Impact | 0.03515723 | High Impact|
+| 27   | 0.022676147  | Medium Impact | 0.03965913 | High Impact|
+| 28   | 0.001344199  | Low Impact    | 0.05062086 | High Impact|
+| 29   | 0.013923136  | Low Impact    | 0.05185863 | High Impact|
+
+
+## Calculate Species Contribution to Beta Diversity
+
+```{r}
+# Calculate Species Contribution to Beta Diversity
+SCBD = beta.div(fish, method = "hellinger")
+
+# View Species Contribution to Beta Diversity
+SCBD
+```
+
+#### Table 4: Species Contributions to Beta Diversity
+
+| Species | SCBD       | Impact       |
+|---------|------------|--------------|
+| Cogo    | 0.03179477 | Medium Impact|
+| Satr    | 0.14229130 | High Impact  |
+| Phph    | 0.09491247 | High Impact  |
+| Neba    | 0.07129053 | High Impact  |
+| Thth    | 0.03367740 | Medium Impact|
+| Teso    | 0.03031386 | Medium Impact|
+| Chna    | 0.01535243 | Low Impact   |
+| Chto    | 0.02335210 | Medium Impact|
+| Lele    | 0.03448797 | Medium Impact|
+| Lece    | 0.03534994 | Medium Impact|
+| Baba    | 0.02901233 | Medium Impact|
+| Spbi    | 0.02093510 | Low Impact   |
+| Gogo    | 0.03134639 | Medium Impact|
+| Eslu    | 0.02722712 | Medium Impact|
+| Pefl    | 0.02705394 | Medium Impact|
+| Rham    | 0.02321227 | Medium Impact|
+| Legi    | 0.02060750 | Low Impact   |
+| Scer    | 0.01900080 | Low Impact   |
+| Cyca    | 0.01654732 | Low Impact   |
+| Titi    | 0.02923874 | Medium Impact|
+| Abbr    | 0.01899880 | Low Impact   |
+| Icme    | 0.01330308 | Low Impact   |
+| Acce    | 0.03326809 | Medium Impact|
+| Ruru    | 0.05494183 | High Impact  |
+| Blbj    | 0.02410392 | Medium Impact|
+| Alal    | 0.07964366 | High Impact  |
+| Anan    | 0.01873634 | Low Impact   |
+
+
+
+
